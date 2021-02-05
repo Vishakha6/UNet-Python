@@ -35,3 +35,5 @@ if __name__=="__main__":
     output_directory = args.output_directory
     logger.info('output_directory = {}'.format(output_directory))
     unet_test.read_file(input_directory, pixelsize, output_directory)
+    
+    
