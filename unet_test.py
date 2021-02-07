@@ -139,7 +139,7 @@ def run_segmentation(ome_path, tif, ind, pixelsize, output_directory):
                     x_max = min([image.shape[1],x_+1024])
                     for y_ in range(0,image.shape[0], 1024):
                         y_max = min([image.shape[0],y_+1024])
-                        input_img = image[x_:x_+1024, y_:y_+1024]
+                        input_img = image[y_:y_+1024, x_:x_+1024]
                         img_pixelsize_x = pixelsize                 
                         img_pixelsize_y = pixelsize
                         modelfile_path = "2d_cell_net_v0-cytoplasm.modeldef.h5"
@@ -177,7 +177,7 @@ def read_file(input_directory, pixelsize, output_directory):
                         for c in range(br.C):
 
                             with BioWriter(f'out{i}.ome.tif',
-                                    backend='java',
+                                    backend='python',
                                     metadata=br.metadata,
                                     max_workers = cpu_count()) as bw:
 
