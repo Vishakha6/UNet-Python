@@ -37,7 +37,7 @@ def normalize(img):
     return np.true_divide(img_centered, img_range)
 
 
-def unet_segmentation(ind,input_img,img_pixelsize_x,img_pixelsize_y,
+def unet_segmentation(input_img,img_pixelsize_x,img_pixelsize_y,
                           modelfile_path,weightfile_path,iofile_path,
                           tiling_x=4,tiling_y=4,gpu_flag='0',
                           cleanup=True):
@@ -127,43 +127,22 @@ def unet_segmentation(ind,input_img,img_pixelsize_x,img_pixelsize_y,
     return segmentation_mask
 
 
-def run_segmentation(ome_path, tif, ind, pixelsize, output_directory):
-
-    out_path = Path(output_directory)
-    br = BioReader(ome_path,backend='java')
-    with BioWriter(out_path.joinpath(f"output{ind}.ome.tif"),metadata = br.metadata,
-                            backend='java') as bw:
-        for page in tif.pages:
-                image = page.asarray()
-                for x_ in range(0,image.shape[1],1024):
-                    x_max = min([image.shape[1],x_+1024])
-                    for y_ in range(0,image.shape[0], 1024):
-                        y_max = min([image.shape[0],y_+1024])
-                        input_img = image[y_:y_+1024, x_:x_+1024]
-                        img_pixelsize_x = pixelsize                 
-                        img_pixelsize_y = pixelsize
-                        modelfile_path = "2d_cell_net_v0-cytoplasm.modeldef.h5"
-                        weightfile_path = "snapshot_cytoplasm_iter_1000.caffemodel.h5"
-                        iofile_path = "output.h5"
-                        img = unet_segmentation(ind,input_img,img_pixelsize_x, \
-                                       img_pixelsize_y,modelfile_path,weightfile_path,iofile_path)
-                        bw[y_:y_max, x_:x_max,...] = img
-                        os.remove("output.h5")
-    br.close()
-    os.remove(f"out{ind}.ome.tif")
-
-
 def read_file(input_directory, pixelsize, output_directory):
 
-    rootdir = Path(input_directory)
+    img_pixelsize_x = pixelsize                 
+    img_pixelsize_y = pixelsize
+    modelfile_path = "2d_cell_net_v0-cytoplasm.modeldef.h5"
+    weightfile_path = "snapshot_cytoplasm_iter_1000.caffemodel.h5"
+    iofile_path = "output.h5"
+    out_path = Path(output_directory)
+    rootdir1 = Path(input_directory)
     """ Convert the tif to tiled tiff """
     javabridge.start_vm(args=["-Dlog4j.configuration=file:{}".format(LOG4J)],
                         class_path=JARS,
                         run_headless=True)
     i = 0
     try:
-        for PATH in rootdir.glob('**/*'):
-            if str(PATH).find("ome.tif")== -1:
+        for PATH in rootdir1.glob('**/*'):
                 tile_grid_size = 1
                 tile_size = tile_grid_size * 1024
 
@@ -176,10 +155,7 @@ def read_file(input_directory, pixelsize, output_directory):
                         # Loop through channels
                         for c in range(br.C):
 
-                            with BioWriter(f'out{i}.ome.tif',
-                                    backend='python',
-                                    metadata=br.metadata,
-                                    max_workers = cpu_count()) as bw:
+                            with BioWriter(out_path.joinpath(f"final{i}.ome.tif"),metadata = br.metadata, backend='java') as bw:
 
                                  # Loop through z-slices
                                 for z in range(br.Z):
@@ -191,16 +167,14 @@ def read_file(input_directory, pixelsize, output_directory):
                                         # Loop across the depth of the image
                                         for x in range(0,br.X,tile_size):
                                             x_max = min([br.X,x+tile_size])
-                                            bw[y:y_max,x:x_max,z:z+1,0,0] = br[y:y_max,x:x_max,z:z+1,c,t]
- 
-                            with TiffFile(f'out{i}.ome.tif') as tif:
-                                    ome_path = f'out{i}.ome.tif'
-                                    run_segmentation(ome_path,tif, i, pixelsize, output_directory)
+
+                                            input_img = np.squeeze(br[y:y_max,x:x_max,z:z+1,c,t])
+                                            img = unet_segmentation(input_img,img_pixelsize_x, img_pixelsize_y,modelfile_path,weightfile_path,iofile_path)
+                                            bw[y:y_max, x:x_max,...] = img
+                                            os.remove("output.h5")
+                                            
                             
-            elif str(PATH).find("ome.tif") != -1:
-                with TiffFile(PATH) as tif:
-                    run_segmentation(PATH,tif, i, pixelsize, output_directory)
-            i+=1
+                i+=1
 
     finally:
         # Close the javabridge. Since this is in the finally block, it is always run
