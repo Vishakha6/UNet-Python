@@ -1,0 +1,6 @@
+python_javabridge==4.0.0
+numpy==1.19.5
+bfio==2.0.2
+h5py==3.1.0
+javabridge==1.0.19
+Pillow==8.1.0
